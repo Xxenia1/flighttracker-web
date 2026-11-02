@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FlightTracker</title>
+  <script>
+    try {
+      const savedTheme = localStorage.getItem('flightTracker.theme');
+      document.documentElement.dataset.theme = savedTheme === 'light' || savedTheme === 'dark'
+        ? savedTheme : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    } catch {
+      document.documentElement.dataset.theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+  </script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
+    integrity="sha256-kLaT2GOSpHechhsozzB+flnD+zUyjE2LlfWPgU04xyI=" crossorigin="">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"
+    integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <div>
+        <h1 id="pageTitle" data-i18n="title">FlightTracker</h1>
+        <p class="header-subtitle" data-i18n="subtitle">Flights, airports and routes in one view</p>
+      </div>
+      <div class="header-actions">
+        <button id="languageButton" type="button" class="header-button" aria-label="Switch to Chinese">中文</button>
+        <button id="themeButton" type="button" class="header-button" aria-label="Switch to night mode">Night mode</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="page">
+    <div id="status" class="status" role="status" aria-live="polite" hidden></div>
+
+    <section class="overview-grid" aria-label="Location and nearby airport" data-i18n-aria="overviewRegion">
+      <div class="card overview-card">
+        <div class="card-heading">
+          <h2 data-i18n="currentLocation">Your current location</h2>
+          <button id="locationButton" type="button" class="secondary-button" data-i18n="refreshLocation">Update location</button>
+        </div>
+        <p id="location" class="overview-value">—</p>
+      </div>
+      <div class="card overview-card">
+        <h2 data-i18n="nearbyAirport">Nearby airport</h2>
+        <p id="nearbyAirport" class="overview-value">—</p>
+      </div>
+    </section>
+
+    <section class="card section-card" aria-labelledby="routeHeading">
+      <div class="section-heading">
+        <div>
+          <h2 id="routeHeading" data-i18n="routeSearch">Search scheduled routes</h2>
+          <p id="cityCodeHint" class="section-note" data-i18n="cityCodeHint">Enter a city name or IATA code.</p>
+        </div>
+      </div>
+      <div class="search-grid">
+        <label for="fromCity">
+          <span data-i18n="from">From city</span>
+          <input id="fromCity" name="fromCity" maxlength="50" autocomplete="off" list="cityOptions"
+            aria-describedby="cityCodeHint" placeholder="e.g. Beijing or BJS" data-i18n-placeholder="fromPlaceholder">
+        </label>
+        <label for="toCity">
+          <span data-i18n="to">To city</span>
+          <input id="toCity" name="toCity" maxlength="50" autocomplete="off" list="cityOptions"
+            aria-describedby="cityCodeHint" placeholder="e.g. Shanghai or SHA" data-i18n-placeholder="toPlaceholder">
+        </label>
+        <button id="searchButton" type="button" class="primary-button" data-i18n="search">Search</button>
+      </div>
+      <datalist id="cityOptions"></datalist>
+      <div id="cityChoices" class="city-choices" role="group" aria-live="polite" hidden></div>
+      <div class="table-scroll routes-table-scroll" role="region" aria-label="Scheduled routes" tabindex="0" data-i18n-aria="routesTable">
+        <table>
+          <thead><tr>
+            <th scope="col" data-i18n="flight">Flight</th>
+            <th scope="col" data-i18n="departureAirport">Dep. airport</th>
+            <th scope="col" data-i18n="departureTime">Dep. time</th>
+            <th scope="col" data-i18n="arrivalAirport">Arr. airport</th>
+            <th scope="col" data-i18n="arrivalTime">Arr. time</th>
+            <th scope="col" data-i18n="duration">Duration</th>
+            <th scope="col" data-i18n="days">Days</th>
+            <th scope="col" data-i18n="aircraft">Aircraft</th>
+          </tr></thead>
+          <tbody id="routesInfotb"></tbody>
+        </table>
+      </div>
+      <nav id="routePagination" class="route-pagination" aria-label="Route pages" data-i18n-aria="routePages" hidden>
+        <span id="routePageSummary" aria-live="polite"></span>
+        <div class="route-page-controls">
+          <button id="routePrev" type="button" class="secondary-button" data-i18n="previousPage">Previous</button>
+          <span id="routePageNumber"></span>
+          <button id="routeNext" type="button" class="secondary-button" data-i18n="nextPage">Next</button>
+        </div>
+      </nav>
+    </section>
+
+    <section class="card section-card" aria-labelledby="inboundHeading">
+      <div class="section-heading">
+        <div>
+          <h2 id="inboundHeading" data-i18n="inboundFlights">Inbound flights</h2>
+          <p class="section-note" data-i18n="inboundHint">Current arrivals and aircraft positions</p>
+        </div>
+        <label class="airport-picker" for="newAirport">
+          <span data-i18n="selectAirport">Airport</span>
+          <select id="newAirport">
+            <option value="MSN" data-i18n="defaultAirport">Madison (MSN)</option>
+            <option value="MKE" data-i18n="milwaukee">Milwaukee (MKE)</option>
+            <option value="ORD" data-i18n="chicago">Chicago O'Hare (ORD)</option>
+            <option value="ATL" data-i18n="atlanta">Atlanta (ATL)</option>
+          </select>
+        </label>
+      </div>
+      <div class="inbound-grid">
+        <div class="inbound-table-panel">
+          <div class="table-scroll routes-table-scroll" role="region" aria-label="Inbound flights" tabindex="0" data-i18n-aria="flightsTable">
+            <table>
+              <thead><tr>
+                <th scope="col" data-i18n="altitude">Altitude</th>
+                <th scope="col" data-i18n="registration">Registration</th>
+                <th scope="col" data-i18n="direction">Direction</th>
+                <th scope="col" data-i18n="latitude">Latitude</th>
+                <th scope="col" data-i18n="longitude">Longitude</th>
+                <th scope="col" data-i18n="flightStatus">Status</th>
+              </tr></thead>
+              <tbody id="table_body"></tbody>
+            </table>
+          </div>
+          <nav id="flightPagination" class="route-pagination" aria-label="Inbound flight pages" data-i18n-aria="flightPages" hidden>
+            <span id="flightPageSummary" aria-live="polite"></span>
+            <div class="route-page-controls">
+              <button id="flightPrev" type="button" class="secondary-button" data-i18n="previousPage">Previous</button>
+              <span id="flightPageNumber"></span>
+              <button id="flightNext" type="button" class="secondary-button" data-i18n="nextPage">Next</button>
+            </div>
+          </nav>
+        </div>
+        <div class="map-wrap">
+          <div class="map-label" data-i18n="flightMap">Flight map</div>
+          <div id="map" role="img" aria-label="Flight map" data-i18n-aria="flightMap"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script src="config.js"></script>
+  <script src="city-catalog.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
